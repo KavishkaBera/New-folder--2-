@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Derivative Simulator</title>
+    <!-- 1. Load Tailwind CSS (Styling) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Load React and ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 3. Load Babel (To translate the code) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-100 p-4">
+
+    <!-- The container where React will render -->
+    <div id="root"></div>
+
+    <!-- The React Code -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Simple Icon Components (SVG) to avoid external dependencies
+        const PlayIcon = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        );
+        const PauseIcon = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+        );
+        const InfoIcon = () => (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+        );
+
+        const DerivativeSim = () => {
+            const [xVal, setXVal] = useState(3.0);
+            const [hVal, setHVal] = useState(1.0);
+            const [isPlaying, setIsPlaying] = useState(false);
+            
+            const f = (x) => 3 * x * x - 4 * x + 5;
+            const fPrime = (x) => 6 * x - 4;
+
+            useEffect(() => {
+                let animationFrame;
+                if (isPlaying) {
+                    const animate = () => {
+                        setHVal((prevH) => {
+                            if (Math.abs(prevH) < 0.01) {
+                                setIsPlaying(false);
+                                return 0.001; 
+                            }
+                            return prevH * 0.95;
+                        });
+                        animationFrame = requestAnimationFrame(animate);
+                    };
+                    animationFrame = requestAnimationFrame(animate);
+                }
+                return () => cancelAnimationFrame(animationFrame);
+            }, [isPlaying]);
+
+            const yVal = f(xVal);
+            const xPlusH = xVal + hVal;
+            const yPlusH = f(xPlusH);
+            
+            const rise = yPlusH - yVal;
+            const run = hVal;
+            const approximateSlope = rise / run;
+            const exactSlope = fPrime(xVal);
+            const error = approximateSlope - exactSlope;
+
+            const width = 600;
+            const height = 400;
+            const xMin = -2;
+            const xMax = 6;
+            const yMin = -10;
+            const yMax = 60;
+            
+            const toSvgX = (x) => ((x - xMin) / (xMax - xMin)) * width;
+            const toSvgY = (y) => height - ((y - yMin) / (yMax - yMin)) * height;
+
+            const generateCurvePath = () => {
+                let d = `M ${toSvgX(xMin)} ${toSvgY(f(xMin))}`;
+                for (let x = xMin; x <= xMax; x += 0.1) {
+                    d += ` L ${toSvgX(x)} ${toSvgY(f(x))}`;
+                }
+                return d;
+            };
+
+            const getLinePoints = (x, y, slope) => {
+                const yAtMin = y + slope * (xMin - x);
+                const yAtMax = y + slope * (xMax - x);
+                return {
+                    x1: toSvgX(xMin), y1: toSvgY(yAtMin),
+                    x2: toSvgX(xMax), y2: toSvgY(yAtMax)
+                };
+            };
+
+            const tanLine = getLinePoints(xVal, yVal, exactSlope);
+            const secLine = getLinePoints(xVal, yVal, approximateSlope);
+
+            return (
+                <div className="flex flex-col items-center max-w-4xl mx-auto font-sans">
+                    <div className="w-full bg-white p-6 rounded-xl shadow-lg">
+                        <h2 className="text-2xl font-bold mb-2 text-slate-800">Visualizing the Derivative Error</h2>
+                        <p className="text-slate-600 mb-6 text-center">
+                            See why the "Code Slope" (Green) is slightly different from the "Exact Math Slope" (Red) 
+                            when <strong>h</strong> is not zero.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                            {/* Controls */}
+                            <div className="space-y-6 md:col-span-1 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        Position x = {xVal.toFixed(2)}
+                                    </label>
+                                    <input 
+                                        type="range" min="-1" max="5" step="0.1" 
+                                        value={xVal}
+                                        onChange={(e) => setXVal(parseFloat(e.target.value))}
+                                        className="w-full accent-blue-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="block text-sm font-semibold text-slate-700">
+                                            Step Size h = {hVal.toFixed(4)}
+                                        </label>
+                                        <button 
+                                            onClick={() => setIsPlaying(!isPlaying)}
+                                            className="p-1 rounded-full hover:bg-slate-200 text-blue-600 transition-colors"
+                                        >
+                                            {isPlaying ? <PauseIcon /> : <PlayIcon />}
+                                        </button>
+                                    </div>
+                                    <input 
+                                        type="range" min="-1.5" max="1.5" step="0.001" 
+                                        value={hVal}
+                                        onChange={(e) => {
+                                            const val = parseFloat(e.target.value);
+                                            setHVal(val === 0 ? 0.001 : val);
+                                            setIsPlaying(false);
+                                        }}
+                                        className="w-full accent-green-600"
+                                    />
+                                </div>
+
+                                <div className="bg-white p-3 rounded border border-slate-200 text-sm space-y-2">
+                                    <div className="flex justify-between items-center text-green-700 font-semibold">
+                                        <span>Approx Slope:</span>
+                                        <span className="font-mono text-lg">{approximateSlope.toFixed(3)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-red-600 font-semibold">
+                                        <span>Exact Slope:</span>
+                                        <span className="font-mono text-lg">{exactSlope.toFixed(3)}</span>
+                                    </div>
+                                    <div className="mt-2 p-2 bg-yellow-50 text-yellow-800 rounded border border-yellow-100 flex justify-between items-center">
+                                        <span className="font-bold text-xs uppercase tracking-wide">Error Gap:</span>
+                                        <span className="font-mono font-bold">{error.toFixed(4)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Graph */}
+                            <div className="md:col-span-2 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden relative">
+                                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto cursor-crosshair">
+                                    <line x1={toSvgX(xMin)} y1={toSvgY(0)} x2={toSvgX(xMax)} y2={toSvgY(0)} stroke="#e2e8f0" strokeWidth="2" />
+                                    <line x1={toSvgX(0)} y1={toSvgY(yMin)} x2={toSvgX(0)} y2={toSvgY(yMax)} stroke="#e2e8f0" strokeWidth="2" />
+                                    <path d={generateCurvePath()} fill="none" stroke="#3b82f6" strokeWidth="3" />
+                                    <line x1={tanLine.x1} y1={tanLine.y1} x2={tanLine.x2} y2={tanLine.y2} stroke="#ef4444" strokeWidth="2" strokeDasharray="5,5" opacity="0.6" />
+                                    <line x1={secLine.x1} y1={secLine.y1} x2={secLine.x2} y2={secLine.y2} stroke="#22c55e" strokeWidth="2" />
+                                    <path d={`M ${toSvgX(xVal)} ${toSvgY(yVal)} L ${toSvgX(xPlusH)} ${toSvgY(yVal)} L ${toSvgX(xPlusH)} ${toSvgY(yPlusH)}`} fill="none" stroke="#94a3b8" strokeWidth="1" strokeDasharray="2,2" />
+                                    <circle cx={toSvgX(xVal)} cy={toSvgY(yVal)} r="6" fill="#ef4444" stroke="white" strokeWidth="2" />
+                                    <circle cx={toSvgX(xPlusH)} cy={toSvgY(yPlusH)} r="6" fill="#22c55e" stroke="white" strokeWidth="2" />
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DerivativeSim />);
+    </script>
+</body>
+</html>
